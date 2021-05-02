@@ -16,7 +16,7 @@ import (
 //因为loggo.Log是有锁的，所以应该没问题
 func TestLog(t *testing.T)  {
 	start := time.Now()
-	logger := New("E:\\log\\test\\", "", LstdFlags, Debug)
+	logger := NewPdLogger("E:\\log\\test\\", "", LstdFlags, Debug)
 	var wg sync.WaitGroup
 	wg.Add(10)
 	go writeLog("AAAAAAAAAA", logger, &wg)

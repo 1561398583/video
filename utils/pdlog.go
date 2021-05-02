@@ -9,8 +9,12 @@ import (
 )
 
 //新开一个协程，每天检查日期，如果是新的一天就新建一个log文件，然后log写入新log文件。
-
-func New(dir string, prefix string, flag int,  level LogLevel) *PdLog {
+/**
+dir:log file 目录，每天在这个目录中产生新的log文件
+prefix:每一行log的前缀
+level:记录log的级别
+ */
+func NewPdLogger(dir string, prefix string, flag int,  level LogLevel) *PdLog {
 	//获取日期
 	timeStr := time.Now().String()
 	//获取"year/month/day"
@@ -18,7 +22,7 @@ func New(dir string, prefix string, flag int,  level LogLevel) *PdLog {
 	logFileName := dir + dateStr
 	logFile, err := os.OpenFile(logFileName, os.O_APPEND | os.O_CREATE, 0777 )
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	logger := log.New(logFile, prefix, flag)
 	pl := &PdLog{log: logger, level: level, dir: dir, currentLogFile: logFile, dateStr: dateStr}
@@ -141,14 +145,14 @@ func (pl *PdLog) CheckDateAndNewFile()  {
 			logFileName := pl.dir + dateStr
 			logFile, err := os.OpenFile(logFileName, os.O_APPEND | os.O_CREATE, 0777 )
 			if err != nil {
-				log.Fatal(err)
+				panic(err)
 			}
 			//设置新的log文件
 			pl.log.SetOutput(logFile)
 			//关闭老的log文件
 			err = pl.currentLogFile.Close()
 			if err != nil {
-				log.Fatal(err)
+				panic(err)
 			}
 			//loggo持有新的log文件
 			pl.currentLogFile = logFile

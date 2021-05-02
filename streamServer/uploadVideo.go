@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"yx.com/videos/constent"
+	"yx.com/videos/ServerConst"
 )
 
 func UploadVideo(c *gin.Context)  {
@@ -27,7 +27,7 @@ func UploadVideo(c *gin.Context)  {
 
 	files := form.File["files"]
 	for _, file := range files {
-		dest := constent.VIDEO_DIR + file.Filename
+		dest := ServerConst.VIDEO_DIR + file.Filename
 		if err := c.SaveUploadedFile(file, dest); err != nil{
 			c.String(http.StatusBadRequest, "err : s%", err.Error())
 		}

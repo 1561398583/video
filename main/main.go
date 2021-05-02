@@ -3,33 +3,26 @@ package main
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"io"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"time"
-	"yx.com/videos/streamServer"
+	"yx.com/videos/ServerConst"
+	"yx.com/videos/api"
+	"yx.com/videos/midWare"
 	"yx.com/videos/utils"
 )
 
 
 func main()  {
+	//开启debugger
+	StartHTTPDebuger()
+
+	//gin engine
 	r := gin.New()
 
-	logf, err := os.Create(LOG_DIR + "gin.log")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	pdw := utils.NewPdWriter(LOG_DIR + "pdlog/")
-
-	//log write to 2 place
-	logWriter := io.MultiWriter(logf, pdw)
-
-	//gin packed all properties in LogFormatterParams,
-	//then give you LogFormatterParams,
-	//then you  can decide how to organize these properties to a string,
-	//return the string
+	//设置日志
 	logFormatterFunc := func(params gin.LogFormatterParams) string {
 		// your custom format
 		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
@@ -40,9 +33,13 @@ func main()  {
 			params.Request.Proto,
 			params.StatusCode,
 			params.Latency,
-			params.Request.UserAgent(),
-			params.ErrorMessage,
+			//params.Request.UserAgent(),
+			//params.ErrorMessage,
 		)
+	}
+	logWriter, err := os.OpenFile(ServerConst.LOG_DIR+ "gin.log", os.O_APPEND | os.O_CREATE, 0777 )
+	if err != nil {
+		log.Fatal(err)
 	}
 	loggerConfig := gin.LoggerConfig{
 		Formatter: logFormatterFunc,
@@ -51,15 +48,14 @@ func main()  {
 	logger := gin.LoggerWithConfig(loggerConfig)
 	r.Use(logger)
 
-	frc, err := os.Create(LOG_DIR + "recover.log")
+
+	//捕获panic，并写入log
+	frc, err := os.Create(ServerConst.LOG_DIR + "recover.log")
 	if err != nil {
 		log.Fatal(err)
 	}
 	r.Use(gin.RecoveryWithWriter(frc))
-
-	streamServer.InitializeConnLimiter(1)
-	r.Use(streamServer.GetToken)
-	r.GET("/testLimiter", streamServer.TestLimiter)
+	r.Use(midWare.ErrorHandler)
 
 	//test connect
 	r.GET("/ping", func(context *gin.Context) {
@@ -68,17 +64,41 @@ func main()  {
 		})
 	})
 
-	r.GET("/panic", func(c *gin.Context) {
-		// panic with a string -- the custom middleware could save this to a database or report it to the user
-		panic("foo")
+
+	//InitErrorTest(r)
+	//InitAbortTest(r)
+
+	//限制访问数量
+	midWare.InitializeRequestLimiter(1)
+	r.Use(midWare.RequestLimit)
+
+	r.GET("/testLimiter", func(c *gin.Context) {
+		now := time.Now().String()
+		fmt.Println("testLimiter : " + now)
+		time.Sleep(time.Second * 30)
+		c.String(http.StatusOK, "i can work")
 	})
+
+
+
+	//设置api error logger
+	api.Logger = utils.NewPdLogger(ServerConst.LOG_DIR+ "apiError/", "", utils.LstdFlags, utils.Debug)
+
+	//指定html文件path
+	r.LoadHTMLGlob(ServerConst.HTML_DIR + "*")
+
+	//设置静态资源
+	r.StaticFS("/assets", http.Dir(ServerConst.ASSETS_DIR))
+
+	//注册handlers
+	api.RegistApi(r)
+
+
 
 	/**
 	upload files
 	 */
 	r.MaxMultipartMemory = 8 << 24  //128M
-	//set directory of HTML
-	r.LoadHTMLGlob("/home/yx/Videos/web/html/*")
 	r.GET("/uploadFilePage", func(context *gin.Context) {
 		context.HTML(http.StatusOK, "uploadFilePage.tmpl", gin.H{
 			"title": "Main website",
@@ -86,6 +106,14 @@ func main()  {
 	})
 	r.POST("/uploadFile", gin.HandlerFunc(utils.UploadFile))
 
-	r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+	r.Run() // listen and serve on 0.0.0.0:8080 (for windowsConst "localhost:8080")
+}
+
+//开启一个http服务，监听":7890"，返回运行信息
+func StartHTTPDebuger()  {
+	pprofHandler := http.NewServeMux()
+	pprofHandler.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
+	server := &http.Server{Addr: ":7890", Handler: pprofHandler}
+	go server.ListenAndServe()
 }
 

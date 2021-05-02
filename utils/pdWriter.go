@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"sync"
@@ -24,7 +23,7 @@ func NewPdWriter(dir string) *PdWriter {
 	filePath := dir + dateStr
 	f, err := os.OpenFile(filePath, os.O_WRONLY | os.O_APPEND | os.O_CREATE, 0777 )
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	pdw := PdWriter{dir: dir, f: f, currentFileName: dateStr}
 	//开启日期检测并替换文件
